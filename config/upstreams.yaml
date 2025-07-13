@@ -1,0 +1,38 @@
+services:
+  api-service:
+    load_balancer: "round_robin"
+    health_check:
+      enabled: true
+      path: "/health"
+      interval: 30s
+      timeout: 5s
+      failure_threshold: 3
+      success_threshold: 2
+    targets:
+      - url: "http://api-service-1:80"
+        weight: 1
+      - url: "http://api-service-2:80"
+        weight: 1
+
+  web-service:
+    load_balancer: "least_connections"
+    health_check:
+      enabled: true
+      path: "/health"
+      interval: 30s
+      timeout: 5s
+      failure_threshold: 3
+      success_threshold: 2
+    targets:
+      - url: "http://web-service-1:80"
+        weight: 2
+      - url: "http://web-service-2:80"
+        weight: 1
+
+  static-service:
+    load_balancer: "ip_hash"
+    health_check:
+      enabled: false
+    targets:
+      - url: "http://static-service:80"
+        weight: 1

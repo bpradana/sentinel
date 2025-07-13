@@ -1,0 +1,39 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Sentinel metrics
+  - job_name: 'sentinel'
+    static_configs:
+      - targets: ['sentinel:8082']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # Sentinel health
+  - job_name: 'sentinel-health'
+    static_configs:
+      - targets: ['sentinel:8081']
+    metrics_path: '/health'
+    scrape_interval: 30s
+
+  # Upstream services health
+  - job_name: 'upstream-services'
+    static_configs:
+      - targets: 
+        - 'api-service-1:80'
+        - 'api-service-2:80'
+        - 'web-service-1:80'
+        - 'web-service-2:80'
+        - 'static-service:80'
+    metrics_path: '/health'
+    scrape_interval: 30s 

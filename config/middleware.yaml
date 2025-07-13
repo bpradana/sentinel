@@ -1,0 +1,48 @@
+chain:
+  # Logging middleware
+  - name: "logging"
+    type: "logging"
+    enabled: true
+    order: 1
+    config:
+      log_requests: true
+      log_responses: true
+      log_headers: false
+      log_body: false
+
+  # Rate limiting middleware
+  - name: "rate_limit"
+    type: "rate_limit"
+    enabled: true
+    order: 2
+    config:
+      requests_per_second: 100
+      burst: 50
+      key_func: "ip"
+
+  # Authentication middleware
+  - name: "auth"
+    type: "auth"
+    enabled: false
+    order: 3
+    config:
+      auth_type: "jwt"
+      secret_key: "your-secret-key"
+      token_header: "Authorization"
+      public_paths:
+        - "/health"
+        - "/metrics"
+
+  # Compression middleware
+  - name: "compression"
+    type: "compression"
+    enabled: true
+    order: 4
+    config:
+      min_size: 1024
+      level: 6
+      content_types:
+        - "text/html"
+        - "text/css"
+        - "application/javascript"
+        - "application/json" 

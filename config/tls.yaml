@@ -1,0 +1,20 @@
+enabled: true
+
+autocert:
+  enabled: false
+  email: "admin@example.com"
+  hosts:
+    - "localhost"
+    - "127.0.0.1"
+    - "api.example.com"
+    - "app.example.com"
+    - "static.example.com"
+  cache_dir: "./certs"
+  staging: true
+
+certificates:
+  - hosts:
+      - "localhost"
+      - "127.0.0.1"
+    cert_file: "./certs/localhost-cert.pem"
+    key_file: "./certs/localhost-key.pem"
