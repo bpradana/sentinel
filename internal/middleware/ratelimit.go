@@ -63,7 +63,7 @@ func (rlm *RateLimitMiddleware) Handle(next http.Handler) http.Handler {
 				zap.String("remote_addr", r.RemoteAddr),
 				zap.String("path", r.URL.Path))
 
-			w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%.2f", rlm.config.RequestsPerSecond))
+			w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", rlm.config.RequestsPerSecond))
 			w.Header().Set("X-RateLimit-Remaining", "0")
 			w.Header().Set("Retry-After", "1")
 
