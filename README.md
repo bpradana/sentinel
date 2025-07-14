@@ -2,6 +2,25 @@
 
 Sentinel is a modern, high-performance reverse proxy written in Go. It provides advanced load balancing, health checking, TLS termination, middleware support, and comprehensive monitoring capabilities.
 
+## 📚 Table of Contents
+
+- [Features](#-features)
+- [Installation](#-installation)
+- [Quick Start](#-quick-start)
+- [Configuration](#-configuration)
+- [TLS & Certificates](#-tls--certificates)
+- [Command Line Tools](#-command-line-tools)
+- [Load Balancing Strategies](#-load-balancing-strategies)
+- [Middleware](#-middleware)
+- [Monitoring](#-monitoring)
+- [Hot Reload](#-hot-reload)
+- [Production Deployment](#-production-deployment)
+- [Troubleshooting](#-troubleshooting)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Support](#-support)
+- [Related Projects](#-related-projects)
+
 ## 🚀 Features
 
 - **Load Balancing**: Round-robin, least connections, and IP hash strategies
@@ -36,6 +55,10 @@ go build -o bin/certgen cmd/certgen/main.go
 
 ### 1. Generate Self-Signed Certificates (Development)
 
+You can either manually generate self-signed certificates or let Sentinel auto-generate them on startup (see [TLS & Certificates](#-tls--certificates)).
+
+**Manual generation:**
+
 ```bash
 # Generate certificates for localhost
 ./bin/certgen -hosts "localhost,127.0.0.1" -output ./certs
@@ -45,6 +68,10 @@ go build -o bin/certgen cmd/certgen/main.go
 # - ./certs/key.pem
 # - ./certs/tls-example.yaml
 ```
+
+**Auto-generation:**
+
+If you configure `auto_generate: true` and `self_signed: true` in your `tls.yaml`, Sentinel will automatically generate self-signed certificates for the specified hosts if the certificate files do not exist.
 
 ### 2. Validate Configuration
 
@@ -136,7 +163,11 @@ rules:
       backoff: 1s
 ```
 
-#### TLS Configuration (`tls.yaml`)
+## 🔐 TLS & Certificates
+
+Sentinel supports flexible TLS configuration, including manual certificates, Let's Encrypt (autocert), and automatic self-signed certificate generation for development and CI environments.
+
+### TLS Configuration Example (`tls.yaml`)
 
 ```yaml
 enabled: true
@@ -154,9 +185,31 @@ certificates:
   - hosts:
       - "localhost"
       - "127.0.0.1"
-    cert_file: "./certs/cert.pem"
-    key_file: "./certs/key.pem"
+    auto_generate: true      # <--- Enable auto-generation
+    self_signed: true        # <--- Use self-signed certs
+    valid_for: "8760h"      # <--- (Optional) Validity duration
+    rsa_bits: 2048          # <--- (Optional) Key size
+    common_name: "localhost" # <--- (Optional) Common Name
+    organization: "Sentinel Inc." # <--- (Optional)
+    cert_file: "./certs/localhost-cert.pem"
+    key_file: "./certs/localhost-key.pem"
 ```
+
+#### Auto-Generate Self-Signed Certificates
+
+- If `auto_generate: true` and `self_signed: true` are set, Sentinel will create a new self-signed certificate for the specified hosts if the files do not exist.
+- This is ideal for local development, CI pipelines, and ephemeral environments.
+- You can customize validity, key size, and subject fields.
+- If the certificate files already exist, Sentinel will use them as-is.
+
+#### Manual Certificate Management
+
+- Omit `auto_generate` or set it to `false` to use existing certificates only.
+- You can use the provided `certgen` tool to generate certificates manually.
+
+#### Let's Encrypt (Autocert)
+
+- Enable the `autocert` section for automatic Let's Encrypt certificate management in production.
 
 ## 🔧 Command Line Tools
 
@@ -296,7 +349,9 @@ WantedBy=multi-user.target
 ### Common Issues
 
 1. **Port already in use**: Check if ports 8080/8443 are available
-2. **Certificate errors**: Ensure certificate files exist and are readable
+2. **Certificate errors**:
+   - If using auto-generation, ensure Sentinel has write permissions to the cert/key file paths.
+   - If using manual certificates, ensure certificate files exist and are readable.
 3. **Upstream connection failures**: Verify upstream services are running
 4. **Configuration validation errors**: Use the validator tool to check configuration
 
