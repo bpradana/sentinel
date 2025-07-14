@@ -1,7 +1,7 @@
 enabled: true
 
 autocert:
-  enabled: false
+  enabled: true
   email: "admin@example.com"
   hosts:
     - "localhost"
@@ -16,5 +16,11 @@ certificates:
   - hosts:
       - "localhost"
       - "127.0.0.1"
+    auto_generate: true
+    self_signed: true
+    valid_for: "8760h"
+    rsa_bits: 2048
+    common_name: "localhost"
+    organization: "Sentinel Inc."
     cert_file: "./certs/localhost-cert.pem"
     key_file: "./certs/localhost-key.pem"

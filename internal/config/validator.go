@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -438,6 +439,11 @@ func validateTLSConfig(config *TLSConfig, log *zap.Logger) error {
 			return fmt.Errorf("certificate %d must have at least one host", i)
 		}
 
+		if cert.AutoGenerate && !cert.SelfSigned {
+			log.Error("Certificate cannot be auto-generated if self-signed is false", zap.Int("certificate", i))
+			return fmt.Errorf("certificate %d cannot be auto-generated if self-signed is false", i)
+		}
+
 		if cert.CertFile == "" {
 			log.Error("Certificate cert file cannot be empty", zap.Int("certificate", i))
 			return fmt.Errorf("certificate %d cert file cannot be empty", i)
@@ -446,6 +452,35 @@ func validateTLSConfig(config *TLSConfig, log *zap.Logger) error {
 		if cert.KeyFile == "" {
 			log.Error("Certificate key file cannot be empty", zap.Int("certificate", i))
 			return fmt.Errorf("certificate %d key file cannot be empty", i)
+		}
+
+		if cert.AutoGenerate || cert.SelfSigned {
+			if cert.CommonName == "" {
+				log.Error("Certificate common name cannot be empty if auto-generate or self-signed is true", zap.Int("certificate", i))
+				return fmt.Errorf("certificate %d common name cannot be empty if auto-generate or self-signed is true", i)
+			}
+
+			if cert.Organization == "" {
+				log.Error("Certificate organization cannot be empty if auto-generate or self-signed is true", zap.Int("certificate", i))
+				return fmt.Errorf("certificate %d organization cannot be empty if auto-generate or self-signed is true", i)
+			}
+
+			if cert.ValidFor == "" {
+				log.Error("Certificate valid for cannot be empty if auto-generate or self-signed is true", zap.Int("certificate", i))
+				return fmt.Errorf("certificate %d valid for cannot be empty if auto-generate or self-signed is true", i)
+			}
+
+			if cert.RSABits == 0 {
+				log.Error("Certificate RSA bits cannot be 0 if auto-generate or self-signed is true", zap.Int("certificate", i))
+				return fmt.Errorf("certificate %d RSA bits cannot be 0 if auto-generate or self-signed is true", i)
+			}
+
+			if cert.ValidFor != "" {
+				if _, err := time.ParseDuration(cert.ValidFor); err != nil {
+					log.Error("Invalid valid_for duration", zap.String("duration", cert.ValidFor), zap.Error(err))
+					return fmt.Errorf("invalid valid_for duration: %w", err)
+				}
+			}
 		}
 	}
 

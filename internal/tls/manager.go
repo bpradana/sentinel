@@ -11,6 +11,7 @@ import (
 
 	"github.com/bpradana/sentinel/internal/config"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -21,6 +22,7 @@ type Manager struct {
 	autocertMgr  *autocert.Manager
 	certificates map[string]*tls.Certificate
 	mu           sync.RWMutex
+	generator    *CertificateGenerator
 }
 
 // NewManager creates a new TLS manager
@@ -38,6 +40,7 @@ func NewManager(cfg *config.TLSConfig, logger *zap.Logger) (*Manager, error) {
 		cfg:          cfg,
 		logger:       logger,
 		certificates: make(map[string]*tls.Certificate),
+		generator:    NewCertificateGenerator(logger),
 	}
 
 	// Initialize auto-cert manager if enabled
@@ -74,11 +77,12 @@ func (m *Manager) initAutoCert() error {
 		m.autocertMgr.Email = m.cfg.AutoCert.Email
 	}
 
-	// Use staging environment if configured
+	// Configure staging environment if enabled
 	if m.cfg.AutoCert.Staging {
-		// For staging, we'll use the default client but with staging directory
-		// The autocert package doesn't expose a Client field directly
-		// We'll handle this by modifying the HostPolicy to use staging
+		// Create ACME client with staging directory
+		m.autocertMgr.Client = &acme.Client{
+			DirectoryURL: "https://acme-staging-v02.api.letsencrypt.org/directory",
+		}
 		m.logger.Info("Using Let's Encrypt staging environment")
 	}
 
@@ -102,6 +106,13 @@ func (m *Manager) loadManualCertificates() error {
 
 // loadCertificate loads a single certificate
 func (m *Manager) loadCertificate(certConfig *config.CertificateConfig) error {
+	// If auto-generate is enabled, check if we need to generate certificates
+	if certConfig.AutoGenerate {
+		if err := m.ensureCertificateExists(certConfig); err != nil {
+			return fmt.Errorf("failed to ensure certificate exists: %w", err)
+		}
+	}
+
 	// Read certificate file
 	certPEM, err := os.ReadFile(certConfig.CertFile)
 	if err != nil {
@@ -131,13 +142,57 @@ func (m *Manager) loadCertificate(certConfig *config.CertificateConfig) error {
 
 	for _, host := range certConfig.Hosts {
 		m.certificates[host] = &cert
-		m.logger.Info("Loaded manual certificate",
+		m.logger.Info("Loaded certificate",
 			zap.String("host", host),
 			zap.String("cert_file", certConfig.CertFile),
-			zap.String("key_file", certConfig.KeyFile))
+			zap.String("key_file", certConfig.KeyFile),
+			zap.Bool("auto_generated", certConfig.AutoGenerate))
 	}
 
 	return nil
+}
+
+// ensureCertificateExists generates certificates if they don't exist or are invalid
+func (m *Manager) ensureCertificateExists(certConfig *config.CertificateConfig) error {
+	// Check if certificate already exists and is valid
+	if m.generator.CheckCertificateExists(certConfig.CertFile, certConfig.KeyFile) {
+		return nil
+	}
+
+	// Only generate self-signed certificates for now
+	if !certConfig.SelfSigned {
+		return fmt.Errorf("auto-generate is enabled but self_signed is false - only self-signed certificates can be auto-generated")
+	}
+
+	// Parse validity duration
+	validFor := 365 * 24 * time.Hour // default 1 year
+	if certConfig.ValidFor != "" {
+		duration, err := time.ParseDuration(certConfig.ValidFor)
+		if err != nil {
+			return fmt.Errorf("invalid valid_for duration: %w", err)
+		}
+		validFor = duration
+	}
+
+	// Set default RSA bits
+	rsaBits := certConfig.RSABits
+	if rsaBits == 0 {
+		rsaBits = 2048
+	}
+
+	// Create certificate generation config
+	genConfig := &SelfSignedCertConfig{
+		Hosts:      certConfig.Hosts,
+		ValidFor:   validFor,
+		RSABits:    rsaBits,
+		CertFile:   certConfig.CertFile,
+		KeyFile:    certConfig.KeyFile,
+		CommonName: certConfig.CommonName,
+		Org:        []string{certConfig.Organization},
+	}
+
+	// Generate certificate
+	return m.generator.GenerateSelfSignedCertificate(genConfig)
 }
 
 // validateCertificate validates a certificate
@@ -280,6 +335,28 @@ func (m *Manager) ValidateHost(host string) bool {
 	}
 
 	return false
+}
+
+// RegenerateCertificates regenerates certificates
+func (m *Manager) RegenerateCertificates() error {
+	m.logger.Info("Regenerating certificates")
+
+	for i, certConfig := range m.cfg.Certificates {
+		if !certConfig.AutoGenerate || !certConfig.SelfSigned {
+			continue
+		}
+
+		// Force regeneration by removing existing files
+		os.Remove(certConfig.CertFile)
+		os.Remove(certConfig.KeyFile)
+
+		if err := m.ensureCertificateExists(&certConfig); err != nil {
+			return fmt.Errorf("failed to regenerate certificate %d: %w", i, err)
+		}
+	}
+
+	// Reload certificates
+	return m.ReloadCertificates()
 }
 
 // Shutdown performs cleanup operations

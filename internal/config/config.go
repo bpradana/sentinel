@@ -135,9 +135,15 @@ type AutoCertConfig struct {
 
 // CertificateConfig defines manual certificate configuration
 type CertificateConfig struct {
-	Hosts    []string `yaml:"hosts"`
-	CertFile string   `yaml:"cert_file"`
-	KeyFile  string   `yaml:"key_file"`
+	Hosts        []string `yaml:"hosts"`
+	CertFile     string   `yaml:"cert_file"`
+	KeyFile      string   `yaml:"key_file"`
+	AutoGenerate bool     `yaml:"auto_generate"`
+	SelfSigned   bool     `yaml:"self_signed"`
+	ValidFor     string   `yaml:"valid_for"`
+	RSABits      int      `yaml:"rsa_bits"`
+	CommonName   string   `yaml:"common_name"`
+	Organization string   `yaml:"organization"`
 }
 
 // HealthConfig defines health check settings
